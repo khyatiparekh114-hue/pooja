@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NOVADROP - Peer to Peer File Transfer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Radar Scanner Animation */
+        @keyframes radarSweep {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .radar-beam {
+            animation: radarSweep 3.5s linear infinite;
+            transform-origin: bottom right;
+        }
+
+        .grid-bg {
+            background-size: 28px 28px;
+            background-image:
+                linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-[#070A11] text-slate-100 min-h-screen flex flex-col justify-between selection:bg-cyan-500 selection:text-white">
+
+    <!-- Top Navbar -->
+    <header
+        class="w-full border-b border-slate-800/80 px-6 py-4 flex items-center justify-between bg-[#070A11]/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="flex items-center gap-3">
+            <div
+                class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-base tracking-wider text-white">NOVADROP</h1>
+                <p class="text-[10px] text-slate-400 font-semibold tracking-widest uppercase">PEER TO PEER</p>
+            </div>
+        </div>
+
+        <!-- Center Status Indicator -->
+        <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs">
+            <span id="networkDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="networkStatusText" class="text-slate-300 font-medium">Network online</span>
+        </div>
+
+        <!-- Right Controls -->
+        <div class="flex items-center gap-3 text-slate-400">
+            <span id="peerBadge"
+                class="hidden text-xs font-semibold px-2.5 py-1 bg-cyan-950/80 border border-cyan-800 text-cyan-400 rounded-lg">
+                Connected: <span id="peerCount">0</span>
+            </span>
+            <button class="p-2 hover:text-white hover:bg-slate-800/60 rounded-lg transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3m.08 4h.01" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        <!-- LEFT PANEL: Hero & Radar (7 Cols) -->
+        <div class="lg:col-span-8 space-y-6">
+
+            <!-- Room Title & Badge -->
+            <div class="flex items-center justify-between">
+                <div>
+                    <span
+                        class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-cyan-400 mb-2">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        SECURE TRANSFER ROOM
+                    </span>
+                    <h2 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-white">Send files.<br />No
+                        middleman.</h2>
+                    <p class="text-sm text-slate-400 mt-2 max-w-lg leading-relaxed">
+                        Transfer directly between devices with end-to-end encryption. Your files never touch a server.
+                    </p>
+                </div>
+
+                <div
+                    class="hidden sm:block text-right bg-slate-900/60 border border-slate-800/80 px-4 py-3 rounded-2xl">
+                    <div class="text-[10px] uppercase tracking-wider font-semibold text-slate-400">THIS SESSION</div>
+                    <div id="sessionTransferred" class="text-xl font-bold font-mono text-cyan-400">0.00 <span
+                            class="text-xs text-slate-400">MB</span></div>
+                </div>
+            </div>
+
+            <!-- Radar Search Box -->
+            <div
+                class="relative w-full h-[320px] rounded-3xl bg-[#090D18] border border-slate-800/80 grid-bg overflow-hidden flex flex-col items-center justify-center p-6 text-center">
+                <!-- Radar Circle Graphic -->
+                <div class="relative w-56 h-56 rounded-full border border-cyan-500/20 flex items-center justify-center">
+                    <div class="w-40 h-40 rounded-full border border-cyan-500/20 flex items-center justify-center">
+                        <div class="w-24 h-24 rounded-full border border-cyan-500/30 flex items-center justify-center">
+                            <div class="w-3.5 h-3.5 rounded-full bg-cyan-400 shadow-[0_0_15px_#22d3ee]"></div>
+                        </div>
+                    </div>
+
+                    <!-- Radar Rotating Beam -->
+                    <div
+                        class="absolute top-0 left-0 w-28 h-28 overflow-hidden origin-bottom-right radar-beam pointer-events-none">
+                        <div class="w-full h-full bg-gradient-to-br from-cyan-500/25 to-transparent rounded-tl-full">
+                        </div>
+                    </div>
+
+                    <!-- Sample Peer Dots -->
+                    <span
+                        class="absolute top-8 right-12 w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc] animate-pulse"></span>
+                    <span
+                        class="absolute bottom-10 left-10 w-2 h-2 rounded-full bg-teal-400 shadow-[0_0_8px_#2dd4bf] animate-ping"></span>
+                </div>
+
+                <p id="radarStatusText" class="text-sm font-semibold text-slate-200 mt-4">Searching for nearby peers</p>
+                <p class="text-xs text-slate-500 mt-1">Keep this tab open while connecting</p>
+
+                <button id="radarRescanBtn"
+                    class="mt-4 px-4 py-2 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-300 flex items-center gap-2 transition">
+                    <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Scan again
+                </button>
+            </div>
+
+            <!-- File Drop Area -->
+            <div id="dropZone"
+                class="group border border-dashed border-slate-800 hover:border-cyan-500/80 bg-[#090D18]/80 hover:bg-slate-900/40 rounded-2xl p-6 text-center cursor-pointer transition flex items-center justify-center gap-4">
+                <input type="file" id="fileInput" class="hidden" />
+                <div
+                    class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-cyan-400 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                </div>
+                <div class="text-left">
+                    <p class="text-sm font-semibold text-slate-200">Drop files here to send</p>
+                    <p class="text-xs text-slate-500">or <span class="text-cyan-400 hover:underline">browse your
+                            device</span> • Unlimited size & all formats</p>
+                </div>
+            </div>
+
+            <!-- Active Transfer Progress Bar -->
+            <div id="progressBox" class="hidden bg-[#090D18] p-5 rounded-2xl border border-slate-800 space-y-3">
+                <div class="flex items-center justify-between text-xs">
+                    <span id="activeFileName" class="font-medium text-slate-200 truncate max-w-sm">uploading.mp4</span>
+                    <span id="activePercent" class="font-mono text-cyan-400 font-bold">0%</span>
+                </div>
+                <div class="w-full bg-slate-800/80 rounded-full h-2.5 overflow-hidden">
+                    <div id="activeProgressBar"
+                        class="h-2.5 bg-gradient-to-r from-cyan-400 to-indigo-500 w-0 transition-all duration-100">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT PANEL: Room Code, Transfers & Stats (4 Cols) -->
+        <div class="lg:col-span-4 space-y-5">
+
+            <!-- Room Code Card -->
+            <div class="bg-[#090D18] border border-slate-800/90 rounded-2xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-300">
+                        <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                        Room code
+                    </div>
+                    <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-medium">Private</span>
+                </div>
+
+                <p class="text-xs text-slate-400">Share this code with your recipient to connect securely.</p>
+
+                <!-- Room Input Display -->
+                <div
+                    class="flex items-center justify-between bg-[#0F1422] border border-slate-800 rounded-xl px-4 py-3">
+                    <input id="roomCodeInput" type="text" placeholder="NOVA - XXXX"
+                        class="bg-transparent font-mono tracking-widest text-cyan-400 font-bold text-sm w-full outline-none uppercase placeholder-slate-600" />
+                    <button id="copyCodeBtn" title="Copy code"
+                        class="p-1 hover:text-cyan-400 text-slate-500 transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="createRoomBtn"
+                        class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl text-slate-200 transition">
+                        Generate Code
+                    </button>
+                    <button id="joinRoomBtn"
+                        class="w-full py-2.5 bg-white text-slate-950 hover:bg-slate-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.393 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                        </svg>
+                        Connect
+                    </button>
+                </div>
+
+                <!-- QR Code Container -->
+                <div id="qrContainer" class="hidden flex flex-col items-center pt-2">
+                    <div id="qrcode" class="p-2 bg-white rounded-xl"></div>
+                    <span class="text-[10px] text-slate-500 mt-2">Scan via mobile camera to join</span>
+                </div>
+            </div>
+
+            <!-- Recent Transfers Card -->
+            <div class="bg-[#090D18] border border-slate-800/90 rounded-2xl p-5 space-y-4">
+                <div class="flex items-center justify-between text-xs font-semibold text-slate-300">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        Recent transfers
+                    </div>
+                    <span class="text-slate-500 text-xs cursor-pointer hover:text-slate-300">•••</span>
+                </div>
+
+                <div id="transferHistoryList" class="space-y-3">
+                    <p id="emptyHistoryNotice" class="text-xs text-slate-600 text-center py-4">No recent files
+                        transferred yet</p>
+                </div>
+            </div>
+
+            <!-- Live Speed Cards -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-[#090D18] border border-slate-800/90 rounded-2xl p-4">
+                    <div class="text-slate-500 text-xs mb-1 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                        </svg>
+                        UPLOAD SPEED
+                    </div>
+                    <div class="text-lg font-bold font-mono text-white"><span id="uploadSpeed">0.0</span> <span
+                            class="text-xs font-normal text-slate-500">MB/s</span></div>
+                </div>
+
+                <div class="bg-[#090D18] border border-slate-800/90 rounded-2xl p-4">
+                    <div class="text-slate-500 text-xs mb-1 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                        </svg>
+                        DOWNLOAD SPEED
+                    </div>
+                    <div class="text-lg font-bold font-mono text-white"><span id="downloadSpeed">0.0</span> <span
+                            class="text-xs font-normal text-slate-500">MB/s</span></div>
+                </div>
+            </div>
+
+            <!-- End-to-end Encrypted Notice -->
+            <div
+                class="bg-emerald-950/20 border border-emerald-900/30 rounded-2xl p-3.5 flex items-center gap-3 text-xs text-emerald-400">
+                <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="font-bold">End-to-end encrypted</div>
+                    <div class="text-[11px] text-slate-400">WebRTC • DTLS 1.3 • AES-256</div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer
+        class="py-4 text-center text-xs text-slate-600 border-t border-slate-900 flex items-center justify-center gap-1.5 uppercase tracking-wider text-[10px]">
+        <svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+        Files stay between you and your peer
+    </footer>
+
+    <script>
+        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+        const CHUNK_SIZE = 64 * 1024; // 64 KB
+
+        let ws = null;
+        let peers = {};
+        let dataChannels = {};
+        let currentRoomId = null;
+        let wakeLock = null;
+
+        // Metrics
+        let totalSessionBytes = 0;
+        let lastBytes = 0;
+        let lastTime = 0;
+
+        // Incoming file assembly
+        let incomingFileMeta = null;
+        let receivedChunks = [];
+        let receivedBytes = 0;
+
+        const roomCodeInput = document.getElementById('roomCodeInput');
+        const createRoomBtn = document.getElementById('createRoomBtn');
+        const joinRoomBtn = document.getElementById('joinRoomBtn');
+        const copyCodeBtn = document.getElementById('copyCodeBtn');
+        const qrContainer = document.getElementById('qrContainer');
+        const qrcodeDiv = document.getElementById('qrcode');
+        const radarStatusText = document.getElementById('radarStatusText');
+        const peerBadge = document.getElementById('peerBadge');
+        const peerCount = document.getElementById('peerCount');
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const progressBox = document.getElementById('progressBox');
+        const activeFileName = document.getElementById('activeFileName');
+        const activePercent = document.getElementById('activePercent');
+        const activeProgressBar = document.getElementById('activeProgressBar');
+        const uploadSpeed = document.getElementById('uploadSpeed');
+        const downloadSpeed = document.getElementById('downloadSpeed');
+        const sessionTransferred = document.getElementById('sessionTransferred');
+        const transferHistoryList = document.getElementById('transferHistoryList');
+        const emptyHistoryNotice = document.getElementById('emptyHistoryNotice');
+
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator && !wakeLock) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (e) { }
+        }
+        function releaseWakeLock() {
+            if (wakeLock) { wakeLock.release(); wakeLock = null; }
+        }
+
+        createRoomBtn.onclick = () => {
+            const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+            roomCodeInput.value = randomCode;
+            renderQR(randomCode);
+            connectToRoom(randomCode);
+        };
+
+        joinRoomBtn.onclick = () => {
+            const code = roomCodeInput.value.trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
+            if (code) {
+                renderQR(code);
+                connectToRoom(code);
+            }
+        };
+
+        copyCodeBtn.onclick = () => {
+            if (roomCodeInput.value) {
+                navigator.clipboard.writeText(roomCodeInput.value);
+                copyCodeBtn.classList.add('text-cyan-400');
+                setTimeout(() => copyCodeBtn.classList.remove('text-cyan-400'), 1500);
+            }
+        };
+
+        function renderQR(code) {
+            qrcodeDiv.innerHTML = '';
+            const joinUrl = `${window.location.origin}/?room=${code}`;
+            new QRCode(qrcodeDiv, {
+                text: joinUrl,
+                width: 120,
+                height: 120,
+                colorDark: '#070A11',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+            qrContainer.classList.remove('hidden');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomParam = urlParams.get('room');
+            if (roomParam) {
+                roomCodeInput.value = roomParam;
+                renderQR(roomParam);
+                connectToRoom(roomParam);
+            }
+        });
+
+        dropZone.onclick = () => fileInput.click();
+        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('border-cyan-400'); };
+        dropZone.ondragleave = () => dropZone.classList.remove('border-cyan-400');
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-cyan-400');
+            if (e.dataTransfer.files.length) handleFileSend(e.dataTransfer.files[0]);
+        };
+        fileInput.onchange = (e) => {
+            if (e.target.files.length) handleFileSend(e.target.files[0]);
+        };
+
+        function connectToRoom(roomId) {
+            currentRoomId = roomId;
+            radarStatusText.innerText = `Connecting to room: ${roomId}...`;
+
+            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${wsProtocol}//${location.host}/ws/${roomId}`);
+
+            ws.onopen = () => {
+                radarStatusText.innerText = `Room active: ${roomId}. Waiting for peers...`;
+            };
+
+            ws.onmessage = async (event) => {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'user-joined') {
+                    initiatePeer(msg.clientId, true);
+                } else if (msg.type === 'offer') {
+                    const peer = initiatePeer(msg.sender, false);
+                    await peer.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                    const answer = await peer.createAnswer();
+                    await peer.setLocalDescription(answer);
+                    ws.send(JSON.stringify({ type: 'answer', target: msg.sender, sdp: answer }));
+                } else if (msg.type === 'answer') {
+                    const peer = peers[msg.sender];
+                    if (peer) await peer.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                } else if (msg.type === 'candidate') {
+                    const peer = peers[msg.sender];
+                    if (peer && msg.candidate) {
+                        await peer.addIceCandidate(new RTCIceCandidate(msg.candidate));
+                    }
+                } else if (msg.type === 'user-left') {
+                    removePeer(msg.clientId);
+                }
+            };
+        }
+
+        function initiatePeer(targetId, isInitiator) {
+            const peer = new RTCPeerConnection(rtcConfig);
+            peers[targetId] = peer;
+
+            peer.onicecandidate = (e) => {
+                if (e.candidate) ws.send(JSON.stringify({ type: 'candidate', target: targetId, candidate: e.candidate }));
+            };
+
+            if (isInitiator) {
+                const channel = peer.createDataChannel('fileTransfer');
+                setupChannel(channel, targetId);
+                dataChannels[targetId] = channel;
+
+                peer.createOffer().then((offer) => {
+                    peer.setLocalDescription(offer);
+                    ws.send(JSON.stringify({ type: 'offer', target: targetId, sdp: offer }));
+                });
+            } else {
+                peer.ondatachannel = (e) => {
+                    setupChannel(e.channel, targetId);
+                    dataChannels[targetId] = e.channel;
+                };
+            }
+            return peer;
+        }
+
+        function setupChannel(channel, clientId) {
+            channel.binaryType = 'arraybuffer';
+
+            channel.onopen = () => {
+                updatePeerCount();
+                radarStatusText.innerText = 'Connected! Ready to transfer files.';
+            };
+
+            channel.onclose = () => removePeer(clientId);
+
+            channel.onmessage = async (event) => {
+                if (typeof event.data === 'string') {
+                    await requestWakeLock();
+                    incomingFileMeta = JSON.parse(event.data);
+                    receivedChunks = [];
+                    receivedBytes = 0;
+                    lastBytes = 0;
+                    lastTime = performance.now();
+                    progressBox.classList.remove('hidden');
+                    activeFileName.innerText = incomingFileMeta.name;
+                    activePercent.innerText = '0%';
+                    activeProgressBar.style.width = '0%';
+                } else {
+                    receivedChunks.push(event.data);
+                    receivedBytes += event.data.byteLength;
+                    totalSessionBytes += event.data.byteLength;
+                    updateSessionStats();
+
+                    // Calculate Download Speed
+                    const now = performance.now();
+                    if (now - lastTime >= 300 || receivedBytes >= incomingFileMeta.size) {
+                        const speed = ((receivedBytes - lastBytes) / ((now - lastTime) / 1000) / (1024 * 1024)).toFixed(1);
+                        downloadSpeed.innerText = speed;
+                        lastBytes = receivedBytes;
+                        lastTime = now;
+                    }
+
+                    const percent = Math.round((receivedBytes / incomingFileMeta.size) * 100);
+                    activePercent.innerText = `${percent}%`;
+                    activeProgressBar.style.width = `${percent}%`;
+
+                    if (receivedBytes >= incomingFileMeta.size) {
+                        const blob = new Blob(receivedChunks, { type: incomingFileMeta.type });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = incomingFileMeta.name;
+                        a.click();
+                        addHistoryItem(incomingFileMeta.name, incomingFileMeta.size);
+                        downloadSpeed.innerText = '0.0';
+                        releaseWakeLock();
+                        setTimeout(() => progressBox.classList.add('hidden'), 2000);
+                    }
+                }
+            };
+        }
+
+        function removePeer(clientId) {
+            if (peers[clientId]) { peers[clientId].close(); delete peers[clientId]; }
+            if (dataChannels[clientId]) { delete dataChannels[clientId]; }
+            updatePeerCount();
+        }
+
+        function updatePeerCount() {
+            const count = Object.keys(dataChannels).filter(id => dataChannels[id].readyState === 'open').length;
+            peerCount.innerText = count;
+            if (count > 0) {
+                peerBadge.classList.remove('hidden');
+            } else {
+                peerBadge.classList.add('hidden');
+                radarStatusText.innerText = 'Searching for nearby peers';
+            }
+        }
+
+        function handleFileSend(file) {
+            const activeChannels = Object.values(dataChannels).filter(ch => ch.readyState === 'open');
+            if (activeChannels.length === 0) {
+                alert('No peers connected yet! Please connect via room code first.');
+                return;
+            }
+
+            requestWakeLock();
+            progressBox.classList.remove('hidden');
+            activeFileName.innerText = file.name;
+            activePercent.innerText = '0%';
+            activeProgressBar.style.width = '0%';
+
+            const metadata = JSON.stringify({ name: file.name, size: file.size, type: file.type });
+            activeChannels.forEach(ch => ch.send(metadata));
+
+            let offset = 0;
+            lastBytes = 0;
+            lastTime = performance.now();
+            const reader = new FileReader();
+
+            function readSlice() {
+                const slice = file.slice(offset, offset + CHUNK_SIZE);
+                reader.readAsArrayBuffer(slice);
+            }
+
+            reader.onload = (e) => {
+                const chunk = e.target.result;
+                activeChannels.forEach(ch => ch.send(chunk));
+                offset += chunk.byteLength;
+                totalSessionBytes += chunk.byteLength;
+                updateSessionStats();
+
+                // Calculate Upload Speed
+                const now = performance.now();
+                if (now - lastTime >= 300 || offset >= file.size) {
+                    const speed = ((offset - lastBytes) / ((now - lastTime) / 1000) / (1024 * 1024)).toFixed(1);
+                    uploadSpeed.innerText = speed;
+                    lastBytes = offset;
+                    lastTime = now;
+                }
+
+                const percent = Math.round((offset / file.size) * 100);
+                activePercent.innerText = `${percent}%`;
+                activeProgressBar.style.width = `${percent}%`;
+
+                if (offset < file.size) {
+                    const maxBuffer = Math.max(...activeChannels.map(ch => ch.bufferedAmount));
+                    if (maxBuffer > 8 * 1024 * 1024) {
+                        setTimeout(readSlice, 50);
+                    } else {
+                        readSlice();
+                    }
+                } else {
+                    addHistoryItem(file.name, file.size);
+                    uploadSpeed.innerText = '0.0';
+                    releaseWakeLock();
+                    setTimeout(() => progressBox.classList.add('hidden'), 2000);
+                }
+            };
+
+            readSlice();
+        }
+
+        function updateSessionStats() {
+            sessionTransferred.innerHTML = `${(totalSessionBytes / (1024 * 1024)).toFixed(2)} <span class="text-xs text-slate-400">MB</span>`;
+        }
+
+        function addHistoryItem(name, bytes) {
+            if (emptyHistoryNotice) emptyHistoryNotice.remove();
+            const sizeStr = (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between text-xs py-1.5 border-b border-slate-800/60 last:border-0';
+            item.innerHTML = `
+        <div class="flex items-center gap-2 max-w-[180px] truncate">
+          <svg class="w-4 h-4 text-cyan-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+          <span class="text-slate-300 truncate">${name}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] font-mono text-slate-500">${sizeStr}</span>
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+      `;
+            transferHistoryList.prepend(item);
+        }
+    </script>
+</body>
+
+</html>
